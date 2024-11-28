@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import schemas
+from app import services
 from app.database import SessionLocal
 
 app = FastAPI()
@@ -21,6 +22,7 @@ async def root() -> dict:
     return {"message": "Hello in my city!!!"}
 
 
+# City
 @app.post("/cities", response_model=schemas.City)
 def create_city(city: schemas.CityCreate, db: Session = Depends(get_db)):
     return crud.create_city(db=db, city=city)
@@ -53,3 +55,18 @@ def delete_city(city_id: int, db: Session = Depends(get_db)):
     if db_city is None:
         raise HTTPException(status_code=404, detail="City not found")
     return db_city
+
+
+# Temperature
+@app.post("/temperatures/update")
+async def update_temperatures(db: Session = Depends(get_db)):
+    cities = crud.get_cities(db)
+    for city in cities:
+        temperature = await services.fetch_temperature(city.name)
+        crud.create_temperature(db, schemas.TemperatureCreate(city_id=city.id, temperature=temperature))
+    return {"detail": "Temperatures updated"}
+
+
+@app.get("/temperatures/", response_model=list[schemas.Temperature])
+def read_temperatures(city_id: int | None = None, db: Session = Depends(get_db)):
+    return crud.get_temperatures(db, city_id)
